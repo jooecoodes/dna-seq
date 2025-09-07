@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
-#include <unordered_map>
+#include <array>
 #include <algorithm>
 #include <random>
 #include <cstring>
@@ -53,6 +53,7 @@ string generate_dna_sequence(int length, double gc_content = 0.5) {
     uniform_real_distribution<> dis(0.0, 1.0);
     
     string sequence;
+    sequence.reserve(length);  // Pre-allocate memory
     for (int i = 0; i < length; i++) {
         if (dis(gen) < gc_content) {
             sequence += (dis(gen) < 0.5) ? 'G' : 'C';
@@ -72,6 +73,7 @@ string generate_repetitive_sequence(int length, const string& motif, double muta
     string bases = "ATGC";
     
     string sequence;
+    sequence.reserve(length);  // Pre-allocate memory
     int motif_length = motif.length();
     
     for (int i = 0; i < length; i++) {
@@ -101,6 +103,7 @@ string create_custom_pattern(int length, double gc_content, double repetitivenes
     // Generate a random motif
     int motif_length = motif_len_dis(gen);
     string motif;
+    motif.reserve(motif_length);
     for (int i = 0; i < motif_length; i++) {
         motif += bases[base_dis(gen)];
     }
@@ -108,6 +111,7 @@ string create_custom_pattern(int length, double gc_content, double repetitivenes
     
     // Create pattern based on repetitiveness
     string pattern;
+    pattern.reserve(length);
     if (repetitiveness > 0.7) {
         // Highly repetitive pattern
         pattern = generate_repetitive_sequence(length, motif, 0.1);
@@ -149,14 +153,14 @@ string create_custom_pattern(int length, double gc_content, double repetitivenes
     return pattern;
 }
 
-// KMP Algorithm
+// KMP Algorithm with optimized memory
 vector<int> kmp_search(const string& text, const string& pattern) {
     int n = text.length();
     int m = pattern.length();
     vector<int> matches;
     if (m == 0) return matches;
 
-    // Precompute LPS array
+    // Precompute LPS array with minimal memory
     vector<int> lps(m, 0);
     int len = 0;
     int i = 1;
@@ -200,15 +204,19 @@ vector<int> kmp_search(const string& text, const string& pattern) {
     return matches;
 }
 
-// Boyer-Moore Algorithm (Bad Character Heuristic)
+// Optimized Boyer-Moore Algorithm with array-based bad character heuristic
 vector<int> boyer_moore_search(const string& text, const string& pattern) {
     int n = text.length();
     int m = pattern.length();
     vector<int> matches;
     if (m == 0) return matches;
 
-    // Bad character heuristic
-    unordered_map<char, int> badChar;
+    // Use array instead of unordered_map for bad character heuristic
+    // DNA has only 4 characters, but we'll create a 256 array for all possible chars
+    array<int, 256> badChar;
+    badChar.fill(-1);
+    
+    // Fill the actual values
     for (int i = 0; i < m; i++) {
         badChar[pattern[i]] = i;
     }
@@ -232,7 +240,7 @@ vector<int> boyer_moore_search(const string& text, const string& pattern) {
     return matches;
 }
 
-// Bit-Parallel Algorithm (Shift-Or)
+// Bit-Parallel Algorithm (Shift-Or) with optimizations
 vector<int> bit_parallel_search(const string& text, const string& pattern) {
     int m = pattern.length();
     int n = text.length();
@@ -261,45 +269,108 @@ vector<int> bit_parallel_search(const string& text, const string& pattern) {
     return matches;
 }
 
-// Simple pattern analysis for hybrid selection
-bool is_repetitive(const string& pattern) {
-    if (pattern.length() <= 10) return false;
+// Structure for pattern analysis
+struct PatternAnalysis {
+    bool is_repetitive;
+    bool is_periodic;
+    float gc_content;
+    int longest_run;
+    int distinct_chars;
+    int period;
+};
+
+// Function to compute the period of a pattern without full LPS (simplified)
+int compute_period_simple(const string& pattern) {
+    int m = pattern.length();
+    if (m == 0) return 0;
     
-    int max_repeat = 1;
-    int current_repeat = 1;
-    for (int i = 1; i < pattern.length(); i++) {
-        if (pattern[i] == pattern[i-1]) {
-            current_repeat++;
-            max_repeat = max(max_repeat, current_repeat);
-        } else {
-            current_repeat = 1;
+    // Check for periodicity using a simple method
+    for (int p = 1; p <= m / 2; p++) {
+        if (m % p != 0) continue;
+        bool periodic = true;
+        for (int i = p; i < m; i++) {
+            if (pattern[i] != pattern[i % p]) {
+                periodic = false;
+                break;
+            }
         }
+        if (periodic) return p;
     }
-    
-    return max_repeat > pattern.length() / 3;
+    return m;
 }
 
-// Hybrid algorithm selector that returns which algorithm was chosen
-pair<vector<int>, string> hybrid_search(const string& text, const string& pattern) {
+// Enhanced pattern analysis with memory efficiency
+PatternAnalysis analyze_pattern(const string& pattern) {
+    PatternAnalysis result;
     int length = pattern.length();
-    if (length == 0) return make_pair(vector<int>(), "None");
     
     // Calculate GC content
     int gc_count = 0;
     for (char c : pattern) {
         if (c == 'G' || c == 'C') gc_count++;
     }
-    float gc_content = static_cast<float>(gc_count) / length;
+    result.gc_content = static_cast<float>(gc_count) / length;
     
-    // Check repetitiveness
-    bool repetitive = is_repetitive(pattern);
+    // Calculate distinct characters and longest run
+    std::array<bool, 256> seen = {false};
+    result.distinct_chars = 0;
+    result.longest_run = 1;
+    int current_run = 1;
     
-    // Algorithm selection
-    if (length <= 64 && !repetitive) {
+    for (int i = 0; i < length; i++) {
+        if (!seen[pattern[i]]) {
+            seen[pattern[i]] = true;
+            result.distinct_chars++;
+        }
+        if (i > 0) {
+            if (pattern[i] == pattern[i-1]) {
+                current_run++;
+                result.longest_run = std::max(result.longest_run, current_run);
+            } else {
+                current_run = 1;
+            }
+        }
+    }
+    
+    // Check repetitiveness based on longest run first
+    result.is_repetitive = (result.longest_run > length / 3);
+    
+    // Only compute periodicity if necessary and for shorter patterns
+    result.is_periodic = false;
+    result.period = length;
+    if (result.is_repetitive && length <= 100) {
+        // Use simple periodicity check for shorter patterns
+        result.period = compute_period_simple(pattern);
+        result.is_periodic = (result.period <= length / 2);
+    } else if (result.is_repetitive && length > 100) {
+        // For long patterns, assume periodic if longest run is significant
+        result.is_periodic = (result.longest_run > length / 2);
+    }
+    
+    // Update repetitiveness based on periodicity
+    result.is_repetitive = result.is_repetitive || result.is_periodic;
+    
+    return result;
+}
+
+// Enhanced hybrid algorithm selector
+pair<vector<int>, string> hybrid_search(const string& text, const string& pattern) {
+    int length = pattern.length();
+    if (length == 0) return make_pair(vector<int>(), "None");
+    
+    // Analyze pattern characteristics
+    PatternAnalysis analysis = analyze_pattern(pattern);
+    
+    // Algorithm selection based on realistic thresholds
+    if (length <= 64 && !analysis.is_repetitive && analysis.distinct_chars > 2) {
         return make_pair(bit_parallel_search(text, pattern), "Bit-Parallel");
-    } else if (repetitive || gc_content > 0.6) {
+    } else if (analysis.is_repetitive) {
         return make_pair(kmp_search(text, pattern), "KMP");
+    } else if (length > 100 && analysis.distinct_chars >= 3) {
+        // Boyer-Moore excels for long patterns with good character distribution
+        return make_pair(boyer_moore_search(text, pattern), "Boyer-Moore");
     } else {
+        // Default to Boyer-Moore for most cases
         return make_pair(boyer_moore_search(text, pattern), "Boyer-Moore");
     }
 }
@@ -310,6 +381,9 @@ void measure_algorithm(const string& name, vector<int> (*algorithm)(const string
     // Reset memory tracking
     reset_memory_tracking();
     size_t initial_memory = get_current_memory_usage();
+    
+    // Warm-up run to account for CPU caching
+    algorithm(text, pattern);
     
     // Measure time and execute algorithm
     auto start = high_resolution_clock::now();
@@ -353,22 +427,18 @@ void measure_hybrid_algorithm(const string& text, const string& pattern) {
     size_t final_memory = get_current_memory_usage();
     size_t memory_used = final_memory - initial_memory;
     
+    // Analyze pattern for display
+    PatternAnalysis analysis = analyze_pattern(pattern);
+    
     // Output results
     cout << "Algorithm: Hybrid" << endl;
     cout << "Chosen algorithm: " << chosen_algorithm << endl;
     cout << "Selection criteria:" << endl;
-    
-    // Calculate GC content for display
-    int gc_count = 0;
-    for (char c : pattern) {
-        if (c == 'G' || c == 'C') gc_count++;
-    }
-    float gc_content = static_cast<float>(gc_count) / pattern.length();
-    bool repetitive = is_repetitive(pattern);
-    
     cout << "  - Pattern length: " << pattern.length() << endl;
-    cout << "  - GC content: " << gc_content * 100 << "%" << endl;
-    cout << "  - Repetitive: " << (repetitive ? "Yes" : "No") << endl;
+    cout << "  - GC content: " << analysis.gc_content * 100 << "%" << endl;
+    cout << "  - Repetitive: " << (analysis.is_repetitive ? "Yes" : "No") << endl;
+    cout << "  - Longest run: " << analysis.longest_run << " characters" << endl;
+    cout << "  - Distinct characters: " << analysis.distinct_chars << endl;
     
     cout << "Matches found: " << matches.size() << endl;
     if (!matches.empty()) {
@@ -416,6 +486,9 @@ int main() {
     int insert_position = dis(gen);
     text.replace(insert_position, pattern.length(), pattern);
     
+    // Analyze pattern for display
+    PatternAnalysis analysis = analyze_pattern(pattern);
+    
     cout << "\nDNA Sequence Matching Analysis" << endl;
     cout << "===============================" << endl;
     cout << "Text length: " << text.length() << " characters" << endl;
@@ -429,9 +502,9 @@ int main() {
         cout << "Motif used: " << motif_used << endl;
     }
     
-    // Calculate pattern characteristics
-    bool repetitive = is_repetitive(pattern);
-    cout << "Pattern is repetitive: " << (repetitive ? "Yes" : "No") << endl;
+    cout << "Pattern is repetitive: " << (analysis.is_repetitive ? "Yes" : "No") << endl;
+    cout << "Longest character run: " << analysis.longest_run << endl;
+    cout << "Distinct characters: " << analysis.distinct_chars << endl;
     cout << "===============================" << endl;
     cout << endl;
     

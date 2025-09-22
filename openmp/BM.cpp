@@ -102,39 +102,50 @@ int main() {
         return 1;
     }
     
-    std::string pattern = "ATG"; // Start codon
-    
     std::cout << "Genome length: " << genome.length() << " bp" << std::endl;
-    std::cout << "Pattern: " << pattern << std::endl;
-    
-    // Serial execution
-    auto start = std::chrono::high_resolution_clock::now();
-    int serial_count = bmhSearchSerial(genome, pattern);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto serial_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    
-    std::cout << "Serial execution:" << std::endl;
-    std::cout << "  Matches found: " << serial_count << std::endl;
-    std::cout << "  Time: " << serial_time << " ms" << std::endl;
-    
-    // Parallel execution with different thread counts
-    for (int num_threads = 2; num_threads <= 8; num_threads *= 2) {
-        start = std::chrono::high_resolution_clock::now();
-        int parallel_count = bmhSearchParallel(genome, pattern, num_threads);
-        end = std::chrono::high_resolution_clock::now();
-        auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        
-        double speedup = static_cast<double>(serial_time) / parallel_time;
-        double efficiency = speedup / num_threads * 100;
-        double overhead = parallel_time - (serial_time / num_threads);
-        
-        std::cout << "\nParallel execution with " << num_threads << " threads:" << std::endl;
-        std::cout << "  Matches found: " << parallel_count << std::endl;
-        std::cout << "  Time: " << parallel_time << " ms" << std::endl;
-        std::cout << "  Speedup: " << speedup << "x" << std::endl;
-        std::cout << "  Efficiency: " << efficiency << "%" << std::endl;
-        std::cout << "  Overhead: " << overhead << " ms" << std::endl;
+
+    // Open the patterns file
+    std::ifstream pfile("patterns.txt");
+    if (!pfile.is_open()) {
+        std::cerr << "Error: could not open patterns.txt" << std::endl;
+        return 1;
     }
-    
+
+    std::string pattern;
+    while (std::getline(pfile, pattern)) {
+        if (pattern.empty()) continue;
+
+        std::cout << "\n=== Testing pattern: " << pattern << " ===" << std::endl;
+
+        // Serial execution
+        auto start = std::chrono::high_resolution_clock::now();
+        int serial_count = bmhSearchSerial(genome, pattern);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto serial_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        
+        std::cout << "Serial execution:" << std::endl;
+        std::cout << "  Matches found: " << serial_count << std::endl;
+        std::cout << "  Time: " << serial_time << " ms" << std::endl;
+        
+        // Parallel execution with different thread counts
+        for (int num_threads = 2; num_threads <= 8; num_threads *= 2) {
+            start = std::chrono::high_resolution_clock::now();
+            int parallel_count = bmhSearchParallel(genome, pattern, num_threads);
+            end = std::chrono::high_resolution_clock::now();
+            auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            
+            double speedup = static_cast<double>(serial_time) / parallel_time;
+            double efficiency = speedup / num_threads * 100;
+            double overhead = parallel_time - (serial_time / num_threads);
+            
+            std::cout << "\nParallel execution with " << num_threads << " threads:" << std::endl;
+            std::cout << "  Matches found: " << parallel_count << std::endl;
+            std::cout << "  Time: " << parallel_time << " ms" << std::endl;
+            std::cout << "  Speedup: " << speedup << "x" << std::endl;
+            std::cout << "  Efficiency: " << efficiency << "%" << std::endl;
+            std::cout << "  Overhead: " << overhead << " ms" << std::endl;
+        }
+    }
+
     return 0;
 }

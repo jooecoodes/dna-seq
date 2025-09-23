@@ -5,6 +5,22 @@
 #include <omp.h>
 #include <chrono>
 #include <algorithm>
+#define NOMINMAX // to not include the old min max func from windows.h that collides with C++’s proper std::min function template.
+#include <windows.h>
+#include <psapi.h>
+
+// Get memory usage in KB
+size_t getMemoryUsageKB() {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(),
+                             (PROCESS_MEMORY_COUNTERS*)&pmc,
+                             sizeof(pmc))) {
+        return pmc.WorkingSetSize / 1024; // Current memory in KB
+    }
+    return 0;
+}
+
+
 
 // Preprocess pattern for bad character rule (Boyer-Moore-Horspool)
 std::vector<int> computeBadChar(const std::string& pattern) {

@@ -6,6 +6,20 @@
 #include <chrono>
 #include <algorithm>
 #include <cstdint>
+#define NOMINMAX // to not include the old min max func from windows.h that collides with C++’s proper std::min function template.
+#include <windows.h>
+#include <psapi.h>
+
+// Get memory usage in KB
+size_t getMemoryUsageKB() {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(),
+                             (PROCESS_MEMORY_COUNTERS*)&pmc,
+                             sizeof(pmc))) {
+        return pmc.WorkingSetSize / 1024; // Current memory in KB
+    }
+    return 0;
+}
 
 // Bit-parallel Shift-Or algorithm implementation
 int shiftOrSearchSerial(const std::string& text, const std::string& pattern) {
@@ -126,16 +140,19 @@ int main() {
         int serial_count = shiftOrSearchSerial(genome, pattern);
         auto end = std::chrono::high_resolution_clock::now();
         auto serial_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        size_t serial_mem = getMemoryUsageKB();
         
         std::cout << "Serial execution:" << std::endl;
         std::cout << "  Matches found: " << serial_count << std::endl;
         std::cout << "  Time: " << serial_time << " ms" << std::endl;
+        std::cout << "  Memory: " << serial_mem << " KB" << std::endl;
         
         for (int num_threads = 2; num_threads <= 8; num_threads *= 2) {
             start = std::chrono::high_resolution_clock::now();
             int parallel_count = shiftOrSearchParallel(genome, pattern, num_threads);
             end = std::chrono::high_resolution_clock::now();
             auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            size_t parallel_mem = getMemoryUsageKB();
             
             double speedup = static_cast<double>(serial_time) / parallel_time;
             double efficiency = speedup / num_threads * 100;
@@ -144,6 +161,7 @@ int main() {
             std::cout << "\nParallel execution with " << num_threads << " threads:" << std::endl;
             std::cout << "  Matches found: " << parallel_count << std::endl;
             std::cout << "  Time: " << parallel_time << " ms" << std::endl;
+            std::cout << "  Memory: " << parallel_mem << " KB" << std::endl;
             std::cout << "  Speedup: " << speedup << "x" << std::endl;
             std::cout << "  Efficiency: " << efficiency << "%" << std::endl;
             std::cout << "  Overhead: " << overhead << " ms" << std::endl;

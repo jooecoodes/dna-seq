@@ -1,5 +1,6 @@
 import math
 import random
+import itertools
 
 def make_dna(length, gc_content, repetitiveness):
     total_GC = round(length * gc_content)
@@ -42,11 +43,15 @@ def calculate_entropy(skew, gc_content):
             entropy -= freq * math.log2(freq)
     return entropy
 
-# === NEW PART: generate patterns ===
+# benchmark bins
+lengths = [64, 128, 256, 512, 1000, 2000]
+gc_contents = [0.2, 0.5, 0.8]
+entropies = [0.3, 1.1, 1.9]
+
+# === NEW PART: generate patterns automatically ===
 patterns = [
-    make_dna(10, 0.4, 1.2),   # short, lower GC
-    make_dna(20, 0.6, 1.5),   # medium, higher GC
-    make_dna(30, 0.5, 2.0),   # longer, more random
+    make_dna(length, gc, h)
+    for length, gc, h in itertools.product(lengths, gc_contents, entropies)
 ]
 
 with open("patterns.txt", "w") as f:

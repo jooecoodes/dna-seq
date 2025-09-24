@@ -1,0 +1,17 @@
+flowchart TD
+    A[computeLPS function] --> B["m = pattern.length()<br>lps = vector<int>(m, 0)<br>len = 0<br>i = 1"]
+    B --> C{"i < m?"}
+    
+    C -->|No| D["return lps"]
+    C -->|Yes| E{"pattern[i] == pattern[len]?"}
+    
+    E -->|Yes| F["len++<br>lps[i] = len<br>i++"]
+    E -->|No| G{"len != 0?"}
+    
+    F --> C
+    
+    G -->|Yes| H["len = lps[len-1]"]
+    G -->|No| I["lps[i] = 0<br>i++"]
+    
+    H --> E
+    I --> C

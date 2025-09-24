@@ -1,0 +1,8 @@
+flowchart TD
+    A[State Machine Operation] --> B["Current State: bit vector<br>1 = mismatch, 0 = match so far"]
+    B --> C["Shift left by 1: state << 1"]
+    C --> D["OR with character mask: | B[text[i]]"]
+    D --> E["Check m-th bit (position m-1)<br>If 0 = full match found"]
+    E --> F{Match Found?}
+    F -->|Yes| G[Increment count]
+    F -->|No| H[Continue scanning]

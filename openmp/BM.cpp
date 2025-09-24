@@ -145,7 +145,7 @@ int main() {
         auto start = std::chrono::high_resolution_clock::now();
         int serial_count = bmhSearchSerial(genome, pattern);
         auto end = std::chrono::high_resolution_clock::now();
-        auto serial_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        auto serial_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         size_t serial_mem = getMemoryUsageKB();
 
         // Parallel (4 threads fixed)
@@ -153,12 +153,18 @@ int main() {
         start = std::chrono::high_resolution_clock::now();
         int parallel_count = bmhSearchParallel(genome, pattern, num_threads);
         end = std::chrono::high_resolution_clock::now();
-        auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        auto parallel_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         size_t parallel_mem = getMemoryUsageKB();
 
-        double speedup = static_cast<double>(serial_time) / parallel_time;
-        double efficiency = speedup / num_threads * 100;
-        double overhead = parallel_time - (serial_time / num_threads);
+        double speedup = 0.0;
+        double efficiency = 0.0;
+        double overhead = 0.0;
+
+        if (parallel_time > 0) {
+            speedup = static_cast<double>(serial_time) / parallel_time;
+            efficiency = speedup / num_threads * 100.0;
+            overhead = parallel_time - (serial_time / num_threads);
+        }
 
         int matches = serial_count; // ground truth matches
 

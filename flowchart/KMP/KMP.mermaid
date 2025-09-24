@@ -1,0 +1,26 @@
+flowchart TD
+    A[Start KMP Search] --> B["n = text.length()<br>m = pattern.length()"]
+    B --> C{m == 0 OR n < m?}
+    C -->|Yes| D["return 0"]
+    C -->|No| E["lps = computeLPS(pattern)"]
+    
+    E --> F["count = 0<br>i = 0<br>j = 0"]
+    F --> G{"i < n?"}
+    
+    G -->|No| H["return count"]
+    G -->|Yes| I{"pattern[j] == text[i]?"}
+    
+    I -->|Yes| J["i++<br>j++"]
+    I -->|No| K{"j != 0?"}
+    
+    J --> L{"j == m?"}
+    L -->|Yes| M["count++<br>j = lps[j-1]"]
+    L -->|No| G
+    
+    M --> G
+    
+    K -->|Yes| N["j = lps[j-1]"]
+    K -->|No| O["i++"]
+    
+    N --> I
+    O --> G

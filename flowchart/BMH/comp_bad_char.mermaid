@@ -1,0 +1,8 @@
+flowchart TD
+    A[computeBadChar function] --> B["table = vector<int>(256, m)"]
+    B --> C["i = 0"]
+    C --> D{"i < m - 1?"}
+    D -->|No| E["return table"]
+    D -->|Yes| F["table[pattern[i]] = m - 1 - i"]
+    F --> G["i++"]
+    G --> D

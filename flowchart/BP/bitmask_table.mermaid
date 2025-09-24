@@ -1,0 +1,8 @@
+flowchart TD
+    A[Build Bitmask Table B] --> B["Initialize all 256 entries to all 1s<br>B[i] = 111...111 (64 bits)"]
+    B --> C["i = 0"]
+    C --> D{"i < m?"}
+    D -->|No| E[Table Complete]
+    D -->|Yes| F["Clear i-th bit for pattern[i]<br>B[pattern[i]] &= ~(1ULL << i)"]
+    F --> G["i++"]
+    G --> D

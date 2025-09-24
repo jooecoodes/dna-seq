@@ -5,7 +5,6 @@
 #include <omp.h>
 #include <chrono>
 #include <algorithm>
-#define NOMINMAX // to not include the old min max func from windows.h that collides with C++’s proper std::min function template.
 #include <windows.h>
 #include <psapi.h>
 
@@ -20,9 +19,7 @@ size_t getMemoryUsageKB() {
     return 0;
 }
 
-
-
-// Preprocess pattern for bad character rule (Boyer-Moore-Horspool)
+// Preprocess pattern for bad character rule (BMH)
 std::vector<int> computeBadChar(const std::string& pattern) {
     std::vector<int> badChar(256, pattern.length());
     for (int i = 0; i < pattern.length() - 1; ++i) {
@@ -31,7 +28,7 @@ std::vector<int> computeBadChar(const std::string& pattern) {
     return badChar;
 }
 
-// Serial Boyer-Moore-Horspool implementation
+// Serial Boyer-Moore-Horspool
 int bmhSearchSerial(const std::string& text, const std::string& pattern) {
     int n = text.length();
     int m = pattern.length();
@@ -54,7 +51,7 @@ int bmhSearchSerial(const std::string& text, const std::string& pattern) {
     return count;
 }
 
-// Parallel Boyer-Moore-Horspool implementation
+// Parallel Boyer-Moore-Horspool
 int bmhSearchParallel(const std::string& text, const std::string& pattern, int num_threads) {
     int n = text.length();
     int m = pattern.length();
@@ -87,81 +84,91 @@ int bmhSearchParallel(const std::string& text, const std::string& pattern, int n
     return total_count;
 }
 
-// Function to read genome from FASTA file
+// Read genome
 std::string readGenome(const std::string& filename) {
     std::ifstream file(filename);
-    std::string line;
-    std::string genome;
-    
-    if (!file.is_open()) {
-        std::cerr << "Error opening file: " << filename << std::endl;
-        return "";
-    }
-    
-    // Skip header line
-    std::getline(file, line);
-    
-    // Read genome data
-    while (std::getline(file, line)) {
-        genome += line;
-    }
-    
-    file.close();
+    std::string line, genome;
+    if (!file.is_open()) return "";
+    std::getline(file, line); // skip header
+    while (std::getline(file, line)) genome += line;
     return genome;
 }
 
 int main() {
-    // Read E. Coli genome
     std::string genome = readGenome("ecoli.fasta");
     if (genome.empty()) {
         std::cerr << "Failed to read genome file." << std::endl;
         return 1;
     }
-    
     std::cout << "Genome length: " << genome.length() << " bp" << std::endl;
 
-    // Open the patterns file
+    // Benchmark metadata arrays
+    std::vector<int> lengths = {64, 128, 256, 512, 1000, 2000};
+    std::vector<double> gc_contents = {0.2, 0.5, 0.8};
+    std::vector<double> entropies = {0.3, 1.1, 1.9};
+
     std::ifstream pfile("patterns.txt");
     if (!pfile.is_open()) {
         std::cerr << "Error: could not open patterns.txt" << std::endl;
         return 1;
     }
 
+    std::ofstream csv("../benchmarks/algo_results/bmh_results.csv");
+    csv << "length,gc_content,entropy,matches,"
+        << "serial_count,serial_time,serial_mem,"
+        << "parallel_count,parallel_time,parallel_mem,"
+        << "speedup,efficiency,overhead\n";
+
     std::string pattern;
+    int idx = 0;
+
     while (std::getline(pfile, pattern)) {
         if (pattern.empty()) continue;
 
-        std::cout << "\n=== Testing pattern: " << pattern << " ===" << std::endl;
+        // Map index -> metadata
+        int len_idx = (idx / (gc_contents.size() * entropies.size())) % lengths.size();
+        int gc_idx  = (idx / entropies.size()) % gc_contents.size();
+        int h_idx   = idx % entropies.size();
 
-        // Serial execution
+        int len = lengths[len_idx];
+        double gc = gc_contents[gc_idx];
+        double h  = entropies[h_idx];
+
+        idx++;
+
+        std::cout << "\n=== Pattern " << idx 
+                  << " | len=" << len 
+                  << " GC=" << gc 
+                  << " H=" << h << " ===" << std::endl;
+
+        // Serial
         auto start = std::chrono::high_resolution_clock::now();
         int serial_count = bmhSearchSerial(genome, pattern);
         auto end = std::chrono::high_resolution_clock::now();
         auto serial_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        
-        std::cout << "Serial execution:" << std::endl;
-        std::cout << "  Matches found: " << serial_count << std::endl;
-        std::cout << "  Time: " << serial_time << " ms" << std::endl;
-        
-        // Parallel execution with different thread counts
-        for (int num_threads = 2; num_threads <= 8; num_threads *= 2) {
-            start = std::chrono::high_resolution_clock::now();
-            int parallel_count = bmhSearchParallel(genome, pattern, num_threads);
-            end = std::chrono::high_resolution_clock::now();
-            auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-            
-            double speedup = static_cast<double>(serial_time) / parallel_time;
-            double efficiency = speedup / num_threads * 100;
-            double overhead = parallel_time - (serial_time / num_threads);
-            
-            std::cout << "\nParallel execution with " << num_threads << " threads:" << std::endl;
-            std::cout << "  Matches found: " << parallel_count << std::endl;
-            std::cout << "  Time: " << parallel_time << " ms" << std::endl;
-            std::cout << "  Speedup: " << speedup << "x" << std::endl;
-            std::cout << "  Efficiency: " << efficiency << "%" << std::endl;
-            std::cout << "  Overhead: " << overhead << " ms" << std::endl;
-        }
+        size_t serial_mem = getMemoryUsageKB();
+
+        // Parallel (4 threads fixed)
+        int num_threads = 4;
+        start = std::chrono::high_resolution_clock::now();
+        int parallel_count = bmhSearchParallel(genome, pattern, num_threads);
+        end = std::chrono::high_resolution_clock::now();
+        auto parallel_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        size_t parallel_mem = getMemoryUsageKB();
+
+        double speedup = static_cast<double>(serial_time) / parallel_time;
+        double efficiency = speedup / num_threads * 100;
+        double overhead = parallel_time - (serial_time / num_threads);
+
+        int matches = serial_count; // ground truth matches
+
+        // Write CSV row
+        csv << len << "," << gc << "," << h << "," << matches << ","
+            << serial_count << "," << serial_time << "," << serial_mem << ","
+            << parallel_count << "," << parallel_time << "," << parallel_mem << ","
+            << speedup << "," << efficiency << "," << overhead << "\n";
     }
 
+    csv.close();
     return 0;
 }

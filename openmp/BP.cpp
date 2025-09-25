@@ -90,7 +90,7 @@ std::string readGenome(const std::string& filename) {
 }
 
 int main() {
-    std::string genome = readGenome("ecoli.fasta");
+    std::string genome = readGenome("../dna/ecoli.fasta");
     if (genome.empty()) {
         std::cerr << "Failed to read genome file." << std::endl;
         return 1;

@@ -1,6 +1,8 @@
-# DNA-Seq
+# DNA Sequencing Algorithms Research
 
-DNA-Seq is a work-in-progress project focused on DNA sequence analysis and processing.  
-The goal of this repository is to provide tools and utilities for handling DNA sequence data, exploring genetic information, and enabling further bioinformatics research and experimentation.
+A research project exploring algorithms and computational methods for DNA sequence analysis.
 
-This project is currently under development and not yet ready for production use.
+## Project Overview
+
+This repository contains our ongoing research into efficient algorithms for DNA sequencing data processing. The focus is on developing an algorithm picker with parallelism of the three algorithms, KMP, Boyer-Moore-Horspool, and Shift/Or bit-parallel algorithm.
+

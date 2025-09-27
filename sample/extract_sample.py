@@ -19,9 +19,9 @@ from collections import Counter
 from pathlib import Path
 
 # --------------- CONFIG ---------------
-FASTA = "../dna/ecoli.fasta"
-OUT_FASTA = "snippets.fasta"
-OUT_CSV = "snippets_metadata.csv"
+FASTA = "../dna/streptomyces_coelicolor.fasta"  # input genome FASTA
+OUT_FASTA = "fasta/snippets.fasta"
+OUT_CSV = "csv/snippets_metadata.csv"
 
 LENGTHS = [64, 128, 256, 512, 1000, 2000]
 PER_LENGTH_K = 9               # 9 per length -> 54 total

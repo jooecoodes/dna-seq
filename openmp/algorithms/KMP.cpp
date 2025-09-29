@@ -4,8 +4,6 @@
 #include <fstream>
 #include <omp.h>
 #include <chrono>
-#include <algorithm>
-#include <cstdint>
 #include <windows.h>
 #include <psapi.h>
 
@@ -20,66 +18,109 @@ size_t getMemoryUsageKB() {
     return 0;
 }
 
-// --- Shift-Or Serial ---
-int shiftOrSearchSerial(const std::string& text, const std::string& pattern) {
+// Preprocess pattern to create LPS array
+std::vector<int> computeLPS(const std::string& pattern) {
+    int m = pattern.length();
+    std::vector<int> lps(m, 0);
+    int len = 0;
+    int i = 1;
+    
+    while (i < m) {
+        if (pattern[i] == pattern[len]) {
+            len++;
+            lps[i] = len;
+            i++;
+        } else {
+            if (len != 0) {
+                len = lps[len - 1];
+            } else {
+                lps[i] = 0;
+                i++;
+            }
+        }
+    }
+    return lps;
+}
+
+// Serial KMP implementation
+int kmpSearchSerial(const std::string& text, const std::string& pattern) {
     int n = text.length();
     int m = pattern.length();
     if (m == 0 || n < m) return 0;
-    if (m > 64) return 0; // Shift-Or limit
 
-    uint64_t B[256];
-    for (int i = 0; i < 256; ++i) B[i] = ~0ULL;
-    for (int i = 0; i < m; ++i) {
-        B[static_cast<unsigned char>(pattern[i])] &= ~(1ULL << i);
-    }
-
-    uint64_t state = ~0ULL;
+    std::vector<int> lps = computeLPS(pattern);
     int count = 0;
+    int i = 0, j = 0;
     
-    for (int i = 0; i < n; ++i) {
-        state = (state << 1) | B[static_cast<unsigned char>(text[i])];
-        if (i >= m - 1 && (state & (1ULL << (m - 1))) == 0) count++;
+    while (i < n) {
+        if (pattern[j] == text[i]) {
+            i++;
+            j++;
+        }
+        
+        if (j == m) {
+            count++;
+            j = lps[j - 1];
+        } else if (i < n && pattern[j] != text[i]) {
+            if (j != 0) {
+                j = lps[j - 1];
+            } else {
+                i++;
+            }
+        }
     }
     return count;
 }
 
-// --- Shift-Or Parallel ---
-int shiftOrSearchParallel(const std::string& text, const std::string& pattern, int num_threads) {
+// Parallel KMP implementation
+int kmpSearchParallel(const std::string& text, const std::string& pattern, int num_threads) {
     int n = text.length();
     int m = pattern.length();
     if (m == 0 || n < m) return 0;
-    if (m > 64) return 0;
 
-    uint64_t B[256];
-    for (int i = 0; i < 256; ++i) B[i] = ~0ULL;
-    for (int i = 0; i < m; ++i) {
-        B[static_cast<unsigned char>(pattern[i])] &= ~(1ULL << i);
-    }
-
+    std::vector<int> lps = computeLPS(pattern);
     int total_count = 0;
-
+    
     #pragma omp parallel num_threads(num_threads) reduction(+:total_count)
     {
-        int tid = omp_get_thread_num();
-        int chunk_size = (n + num_threads - 1) / num_threads;
-        int start = std::max(0, tid * chunk_size - (m - 1));
-        int end = std::min(n, (tid + 1) * chunk_size);
-        
-        uint64_t state = ~0ULL;
         int local_count = 0;
+        int tid = omp_get_thread_num();
+        int chunk_size = n / num_threads;
+        int start = tid * chunk_size;
+        int end = (tid == num_threads - 1) ? n : start + chunk_size;
         
-        for (int i = start; i < end; ++i) {
-            state = (state << 1) | B[static_cast<unsigned char>(text[i])];
-            if (i >= m - 1 && i - (m - 1) >= tid * chunk_size && (state & (1ULL << (m - 1))) == 0) {
+        if (tid > 0) {
+            start -= (m - 1);
+            if (start < 0) start = 0;
+        }
+        
+        int i = start;
+        int j = 0;
+        
+        while (i < end) {
+            if (pattern[j] == text[i]) {
+                i++;
+                j++;
+            }
+            
+            if (j == m) {
                 local_count++;
+                j = lps[j - 1];
+            } else if (i < end && pattern[j] != text[i]) {
+                if (j != 0) {
+                    j = lps[j - 1];
+                } else {
+                    i++;
+                }
             }
         }
+        
         total_count += local_count;
     }
     return total_count;
 }
 
-// --- Read genome ---
+// Read genome
 std::string readGenome(const std::string& filename) {
     std::ifstream file(filename);
     std::string line, genome;
@@ -89,8 +130,12 @@ std::string readGenome(const std::string& filename) {
     return genome;
 }
 
-int main() {
-    std::string genome = readGenome("../dna/ecoli.fasta");
+int main(int argc, char* argv[]) {
+    std::string genome_file = (argc > 1) ? argv[1] : "../dna/ecoli.fasta";
+    std::string pattern_file = (argc > 2) ? argv[2] : "../patterns.txt";
+    std::string output_csv = (argc > 3) ? argv[3] : "../benchmarks/algo_results/bmh_results.csv";
+    std::string genome = readGenome(genome_file);
+
     if (genome.empty()) {
         std::cerr << "Failed to read genome file." << std::endl;
         return 1;
@@ -108,7 +153,7 @@ int main() {
         return 1;
     }
 
-    std::ofstream csv("../benchmarks/algo_results/bp_results.csv");
+    std::ofstream csv(output_csv);
     csv << "length,gc_content,entropy,matches,"
         << "serial_count,serial_time,serial_mem,"
         << "parallel_count,parallel_time,parallel_mem,"
@@ -131,8 +176,6 @@ int main() {
 
         idx++;
 
-        if (pattern.size() > 64) continue; // Shift-Or limit
-
         std::cout << "\n=== Pattern " << idx 
                   << " | len=" << len 
                   << " GC=" << gc 
@@ -140,7 +183,7 @@ int main() {
 
         // Serial
         auto start = std::chrono::high_resolution_clock::now();
-        int serial_count = shiftOrSearchSerial(genome, pattern);
+        int serial_count = kmpSearchSerial(genome, pattern);
         auto end = std::chrono::high_resolution_clock::now();
         auto serial_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         size_t serial_mem = getMemoryUsageKB();
@@ -148,7 +191,7 @@ int main() {
         // Parallel (4 threads fixed)
         int num_threads = 4;
         start = std::chrono::high_resolution_clock::now();
-        int parallel_count = shiftOrSearchParallel(genome, pattern, num_threads);
+        int parallel_count = kmpSearchParallel(genome, pattern, num_threads);
         end = std::chrono::high_resolution_clock::now();
         auto parallel_time = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         size_t parallel_mem = getMemoryUsageKB();
@@ -157,8 +200,7 @@ int main() {
         double efficiency = speedup / num_threads * 100;
         double overhead = parallel_time - (serial_time / num_threads);
 
-        // "matches" = reference count (serial result)
-        int matches = serial_count;
+        int matches = serial_count; // reference
 
         // Write CSV row
         csv << len << "," << gc << "," << h << "," << matches << ","

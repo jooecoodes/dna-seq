@@ -1,42 +1,26 @@
 #include "../../include/FastaReader.hpp"
 
+#include <iostream>
+
 using namespace std;
 
 string FastaReader::readSequence(const string& fastaPath) {
-    ifstream file(fastaPath);
-    if (!file.is_open()) {
-        throw runtime_error("Cannot open FASTA file: " + fastaPath);
+      std::ifstream f(fastaPath);
+    if (!f) {
+        std::cerr << "Error: cannot open " << fastaPath << "\n";
+        std::exit(1);
     }
-    
-    string line;
-    string sequence;
-    bool inSequence = false;
-    
-    while (getline(file, line)) {
-        if (line.empty()) continue;
-        
-        if (line[0] == '>') {
-            // Header line - if we were already reading sequence, we're done
-            if (inSequence) break;
-            inSequence = true;
-            continue;
-        }
-        
-        if (inSequence) {
-            // Remove any whitespace and add to sequence
-            for (char c : line) {
-                if (!isspace(c)) {
-                    sequence += c;
-                }
+    std::string buf, seq;
+    seq.reserve(10'000'000);
+    while (std::getline(f, buf)) {
+        if (!buf.empty() && buf[0] == '>') continue;
+        for (char c : buf) {
+            if (c != '\r' && c != '\n') {
+                c = std::toupper(static_cast<unsigned char>(c));
+                if (c == 'A' || c == 'C' || c == 'G' || c == 'T' || c == 'N')
+                    seq.push_back(c);
             }
         }
     }
-    
-    file.close();
-    
-    if (sequence.empty()) {
-        throw runtime_error("No DNA sequence found in FASTA file: " + fastaPath);
-    }
-    
-    return sequence;
+    return seq;
 }

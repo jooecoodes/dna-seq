@@ -63,7 +63,7 @@ double HybridPicker::calculateGCContent(const std::string& pattern) {
     return static_cast<double>(gc_count) / total_bases;
 }
 
-vector<size_t> HybridPicker::pickAndSearch(const string& algorithmName, 
+size_t HybridPicker::pickAndSearch(const string& algorithmName, 
                                          const string& pattern, 
                                          const string& fastaPath) {
     auto matcher = createMatcher(algorithmName);
@@ -74,12 +74,31 @@ vector<size_t> HybridPicker::pickAndSearch(const string& algorithmName,
     return matcher->searchInFasta(pattern, fastaPath);
 }
 
-vector<size_t> HybridPicker::autoPickAndSearch(const string& pattern, 
+size_t HybridPicker::autoPickAndSearch(const string& pattern, 
                                              const string& fastaPath) {
     string bestAlgorithm = recommendAlgorithm(pattern);
     cout << "Hybrid Picker selected: " << bestAlgorithm << " algorithm" << endl;
     return pickAndSearch(bestAlgorithm, pattern, fastaPath);
 }
+
+size_t HybridPicker::pickAndSearchParallel(const string& algorithmName, 
+                                         const string& pattern, 
+                                         const string& fastaPath) {
+    auto matcher = createMatcher(algorithmName);
+    if (!matcher) {
+        throw invalid_argument("Unknown algorithm: " + algorithmName + 
+                              ". Available: bmh, kmp, bithiftor");
+    }
+    return matcher->searchParallelInFasta(pattern, fastaPath);
+}
+
+size_t HybridPicker::autoPickAndSearchParallel(const string& pattern, 
+                                             const string& fastaPath) {
+    string bestAlgorithm = recommendAlgorithm(pattern);
+    cout << "Hybrid Picker selected: " << bestAlgorithm << " algorithm as parallel" << endl;
+    return pickAndSearchParallel(bestAlgorithm, pattern, fastaPath);
+}
+
 
 string HybridPicker::recommendAlgorithm(const string& pattern) {
     size_t length = pattern.length();

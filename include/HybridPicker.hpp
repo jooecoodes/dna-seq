@@ -24,7 +24,7 @@ public:
      * @return Vector of positions where the pattern was found
      * @throws std::invalid_argument if algorithmName is unknown
      */
-    std::vector<size_t> pickAndSearch(const std::string& algorithmName, 
+    size_t pickAndSearch(const std::string& algorithmName, 
                                      const std::string& pattern, 
                                      const std::string& fastaPath);
     
@@ -34,9 +34,28 @@ public:
      * @param fastaPath Path to the FASTA file containing the DNA sequence
      * @return Vector of positions where the pattern was found
      */
-    std::vector<size_t> autoPickAndSearch(const std::string& pattern, 
+    size_t autoPickAndSearch(const std::string& pattern, 
                                          const std::string& fastaPath);
+        /**
+     * @brief Selects and executes the appropriate pattern matching algorithm
+     * @param algorithmName Name of the algorithm: "bmh", "kmp", or "bithiftor"
+     * @param pattern The DNA pattern to search for
+     * @param fastaPath Path to the FASTA file containing the DNA sequence
+     * @return Vector of positions where the pattern was found
+     * @throws std::invalid_argument if algorithmName is unknown
+     */
+   size_t pickAndSearchParallel(const std::string& algorithmName, 
+                                     const std::string& pattern, 
+                                     const std::string& fastaPath);
     
+    /**
+     * @brief Automatically selects the best algorithm based on pattern characteristics
+     * @param pattern The DNA pattern to search for
+     * @param fastaPath Path to the FASTA file containing the DNA sequence
+     * @return Vector of positions where the pattern was found
+     */
+   size_t autoPickAndSearchParallel(const std::string& pattern, 
+                                         const std::string& fastaPath);
                                          /**
      * @brief Recommends appropriate algorithm based on conditions
      * @return String of the name of the algorithm

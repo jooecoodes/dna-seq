@@ -1,8 +1,5 @@
 #pragma once
 #include <string>
-#include <fstream>
-#include <stdexcept>
-#include <sstream>
 
 class FastaReader {
 public:

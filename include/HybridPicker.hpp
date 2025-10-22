@@ -12,8 +12,6 @@
 class HybridPicker {
 private:
     std::unique_ptr<PatternMatcher> createMatcher(const std::string& algorithmName);
-    double calculateShannonEntropy(const std::string& pattern);
-    double calculateGCContent(const std::string& pattern);
     
 public:
     /**
@@ -67,4 +65,13 @@ public:
      * @return Vector of algorithm names
      */
     std::vector<std::string> getAvailableAlgorithms() const;
+
+    /**
+     * @brief Search with Reverse complement
+     * @return Size of the matches 
+     */
+    size_t searchWithReverseComplementHybrid(const std::string& pattern, 
+                                         const std::string& text, 
+                                         const std::string& algorithmName, 
+                                         bool parallel);
 };

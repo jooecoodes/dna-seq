@@ -71,7 +71,7 @@ void Benchmark::run(const std::string& pattern, const std::string& fastaPath) {
     benchmarkAlgorithmWithReverseComplement("bithiftor", pattern, fastaPath, false);
 
     std::cout << "Parallel: " << std::endl;
-    // benchmarkAlgorithmWithReverseComplement("bmh", pattern, fastaPath, true);
+    benchmarkAlgorithmWithReverseComplement("bmh", pattern, fastaPath, true);
     benchmarkAlgorithmWithReverseComplement("kmp", pattern, fastaPath, true);
     benchmarkAlgorithmWithReverseComplement("bithiftor", pattern, fastaPath, true);
 

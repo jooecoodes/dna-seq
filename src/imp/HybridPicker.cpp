@@ -1,4 +1,6 @@
 #include "../../include/HybridPicker.hpp"
+#include "../../include/BioUtils.hpp"
+
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
@@ -11,56 +13,6 @@ unique_ptr<PatternMatcher> HybridPicker::createMatcher(const string& algorithmNa
     if (algorithmName == "kmp") return make_unique<KMP>();
     if (algorithmName == "bithiftor") return make_unique<BitParallelShiftOr>();
     return nullptr;
-}
-
-double HybridPicker::calculateShannonEntropy(const std::string& pattern) {
-    if (pattern.empty()) return 0.0;
-    
-    // Count each nucleotide (case insensitive)
-    int counts[256] = {0};
-    int total = 0;
-    
-    for (char c : pattern) {
-        char upper = std::toupper(c);
-        if (upper == 'A' || upper == 'T' || upper == 'G' || upper == 'C') {
-            counts[static_cast<unsigned char>(upper)]++;
-            total++;
-        }
-    }
-    
-    if (total == 0) return 0.0;
-    
-    // Calculate entropy
-    double entropy = 0.0;
-    for (int i = 0; i < 256; i++) {
-        if (counts[i] > 0) {
-            double p = static_cast<double>(counts[i]) / total;
-            entropy -= p * std::log2(p);
-        }
-    }
-    
-    // Returns 0.0 (repetitive) to 2.0 (complex)
-    return entropy;
-}
-
-double HybridPicker::calculateGCContent(const std::string& pattern) {
-    if (pattern.empty()) return 0.0;
-    
-    size_t gc_count = 0;
-    size_t total_bases = 0;
-    
-    for (char c : pattern) {
-        char upper = std::toupper(c);
-        if (upper == 'G' || upper == 'C') {
-            gc_count++;
-        }
-        if (upper == 'A' || upper == 'T' || upper == 'G' || upper == 'C') {
-            total_bases++;
-        }
-    }
-    
-    if (total_bases == 0) return 0.0;
-    return static_cast<double>(gc_count) / total_bases;
 }
 
 size_t HybridPicker::pickAndSearch(const string& algorithmName, 
@@ -102,8 +54,8 @@ size_t HybridPicker::autoPickAndSearchParallel(const string& pattern,
 
 string HybridPicker::recommendAlgorithm(const string& pattern) {
     size_t length = pattern.length();
-    double entropy = calculateShannonEntropy(pattern);
-    double gc_content = calculateGCContent(pattern);
+    double entropy = BioUtils::calculateShannonEntropy(pattern);
+    double gc_content = BioUtils::calculateGCContent(pattern);
     double repetitiveness = 2.0 - entropy;
     
     // Decision Tree
@@ -130,4 +82,16 @@ string HybridPicker::recommendAlgorithm(const string& pattern) {
 
 vector<string> HybridPicker::getAvailableAlgorithms() const {
     return {"bmh", "kmp", "bithiftor"};
+}
+
+size_t HybridPicker::searchWithReverseComplementHybrid( const string& pattern, 
+                                         const string& text, 
+                                         const string& algorithmName, 
+                                         bool parallel) {
+    auto matcher = createMatcher(algorithmName);
+    if (!matcher) {
+        throw invalid_argument("Unknown algorithm: " + algorithmName + 
+                              ". Available: bmh, kmp, bithiftor");
+    }
+    return matcher->searchWithReverseComplement(pattern, text, parallel);
 }

@@ -1,5 +1,6 @@
 #include "../../include/BM.hpp"
 #include "../../include/FastaReader.hpp"
+#include "../../include/BioUtils.hpp"
 
 #include <string>
 #include <vector>
@@ -93,4 +94,21 @@ size_t BoyerMooreHorspool::searchParallelInFasta(const std::string& pattern, con
     int num_threads = 4;
     std::string dnaSequence = FastaReader::readSequence(fastaPath);
     return searchParallel(pattern, dnaSequence, num_threads);
+}
+
+size_t BoyerMooreHorspool::searchWithReverseComplement(const std::string& pattern, const std::string& text, bool parallel) const {
+    std::string rc_pattern = BioUtils::reverseComplement(pattern);
+    
+    if (parallel) {
+        int num_threads = 4;
+        // Run searches sequentially but each uses internal parallelism
+        size_t count_pattern = searchParallel(pattern, text, num_threads);
+        size_t count_rc_pattern = searchParallel(rc_pattern, text, num_threads);
+        return count_pattern + count_rc_pattern;
+    } else {
+        // Sequential version
+        size_t count_pattern = search(pattern, text);
+        size_t count_rc_pattern = search(rc_pattern, text);
+        return count_pattern + count_rc_pattern;
+    }
 }
